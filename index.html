@@ -366,7 +366,7 @@
                     if (snake.length <= 5) {
                         clearInterval(game);
                         gameOverDiv.style.display = 'block';
-                        gameOverDiv.innerHTML = 'Game Over!<p>Appuyez sur ESPACE pour recommencer</p>';
+                        gameOverDiv.innerHTML = 'Game Over!<p>Press SPACE to start again</p>';
                         const score = snake.length - 1;
                         if (score > highScore) {
                             highScore = score;
