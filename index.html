@@ -345,7 +345,15 @@
         }
 
         function updateScore() {
-            document.getElementById('scoreValue').textContent = bombs.length;
+            const currentScore = bombs.length; // Le score actuel est le nombre de bombes
+            document.getElementById('scoreValue').textContent = currentScore;
+
+            // Vérifiez si le score actuel est supérieur au meilleur score
+            if (currentScore > highScore) {
+                highScore = currentScore; // Mettez à jour le meilleur score
+                localStorage.setItem('snakeHighScore', highScore); // Stockez le meilleur score
+                document.getElementById('highScoreValue').textContent = highScore; // Mettez à jour l'affichage
+            }
         }
 
         function checkBombCollision() {
