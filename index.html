@@ -614,3 +614,619 @@
     </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOON'S SNAKE</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #4FC3F7;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 60%),
+                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 40%);
+            font-family: 'Bangers', cursive;
+            color: #FFF;
+            overflow: hidden;
+        }
+
+        h1 {
+            text-align: center;
+            color: #FFF;
+            text-shadow: 
+                3px 3px 0 #FF6B6B,
+                -3px -3px 0 #4ECDC4,
+                6px 6px 0 rgba(0,0,0,0.2);
+            margin-bottom: 80px;
+            font-size: 4em;
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            letter-spacing: 2px;
+        }
+
+        .game-container {
+            background: #FFF;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 
+                0 0 0 10px #FF6B6B,
+                0 0 0 20px #4ECDC4,
+                0 10px 20px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        canvas {
+            border-radius: 10px;
+            background-color: #E8F5E9;
+        }
+
+        .score, .high-score {
+            position: absolute;
+            font-family: 'Bangers', cursive;
+            font-size: 1.8em;
+            color: #FF6B6B;
+            text-shadow: 2px 2px 0 #4ECDC4;
+            letter-spacing: 1px;
+        }
+
+        .score {
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .high-score {
+            top: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #4ECDC4;
+            text-shadow: 2px 2px 0 #FF6B6B;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #FF6B6B;
+            font-size: 3em;
+            text-shadow: 3px 3px 0 #4ECDC4;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+            border: 5px solid #FF6B6B;
+            display: none;
+            z-index: 1000;
+            letter-spacing: 2px;
+        }
+
+        .game-over p {
+            margin: 10px 0;
+            font-size: 0.5em;
+            color: #FF6B6B;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 6px;
+            height: 6px;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 1000;
+            border-radius: 2px;
+        }
+
+        .explosion-particle {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <h1>TOON'S SNAKE</h1>
+    <div class="game-container">
+        <div class="high-score">Meilleur Score: <span id="highScoreValue">0</span></div>
+        <div class="score">Score: <span id="scoreValue">0</span></div>
+        <canvas id="snakeGame" width="400" height="400"></canvas>
+        <div class="game-over" id="gameOver">
+            Game Over!
+            <p>Appuyez sur ESPACE pour recommencer</p>
+        </div>
+    </div>
+    <script>
+        // Configuration initiale
+        const canvas = document.getElementById('snakeGame');
+        const ctx = canvas.getContext('2d');
+        const gameOverDiv = document.getElementById('gameOver');
+        const box = 20;
+        let snake, direction, food, currentFruit, game, bombs;
+        let lastDirection;
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        document.getElementById('highScoreValue').textContent = highScore;
+
+        // Images des fruits
+        const fruits = [
+            {
+                name: 'pomme',
+                color: '#ff0000',
+                draw: function(ctx, x, y, size) {
+                    // Corps de la pomme
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(x + box/2, y + box/2, box/2 - 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#8b4513';
+                    ctx.stroke();
+
+                    // Tige
+                    ctx.fillStyle = '#45321d';
+                    ctx.fillRect(x + box/2 - 2, y + 2, 4, 6);
+                }
+            },
+            {
+                name: 'raisin',
+                color: '#800080',
+                draw: function(ctx, x, y, size) {
+                    // Plusieurs petits cercles pour former une grappe triangulaire
+                    ctx.fillStyle = this.color;
+                    const radius = box/6;
+                    
+                    // Première rangée (haut) - 3 raisins
+                    for(let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        ctx.arc(x + box/3 + (i * radius), y + box/3, radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    
+                    // Deuxième rangée (milieu) - 2 raisins
+                    for(let i = 0; i < 2; i++) {
+                        ctx.beginPath();
+                        ctx.arc(x + box/3 + radius/2 + (i * radius), y + box/3 + radius, radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    
+                    // Troisième rangée (bas) - 1 raisin
+                    ctx.beginPath();
+                    ctx.arc(x + box/2, y + box/3 + radius * 2, radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tige
+                    ctx.fillStyle = '#45321d';
+                    ctx.fillRect(x + box/2 - 2, y + 2, 4, 6);
+                }
+            },
+            {
+                name: 'banane',
+                color: '#ffd700',
+                draw: function(ctx, x, y, size) {
+                    // Corps de la banane
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.ellipse(x + box/2, y + box/2, box/3, box/2 - 2, Math.PI/4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#8b4513';
+                    ctx.stroke();
+                }
+            }
+        ];
+
+        function initGame() {
+            snake = [{ x: 9 * box, y: 9 * box }];
+            direction = 'RIGHT';
+            lastDirection = 'RIGHT';
+            food = { x: Math.floor(Math.random() * 20) * box, y: Math.floor(Math.random() * 20) * box };
+            currentFruit = fruits[Math.floor(Math.random() * fruits.length)];
+            bombs = [];
+            gameOverDiv.style.display = 'none';
+            document.getElementById('scoreValue').textContent = '0';
+            if (game) clearInterval(game);
+            game = setInterval(draw, 100);
+        }
+
+        function drawSnakeSegment(x, y, isHead, prevX, prevY, nextX, nextY) {
+            if (isHead) {
+                let angle;
+                if (direction === 'RIGHT') angle = 0;
+                else if (direction === 'LEFT') angle = Math.PI;
+                else if (direction === 'UP') angle = -Math.PI/2;
+                else if (direction === 'DOWN') angle = Math.PI/2;
+                
+                // Corps de la tête
+                ctx.fillStyle = '#4ECDC4';
+                ctx.beginPath();
+                ctx.ellipse(x + box/2, y + box/2, box/2, box/3, angle, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#FF6B6B';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.lineWidth = 1;
+
+                // Yeux
+                const eyeOffset = box/4;
+                const eyeSize = box/6;
+                
+                // Blanc des yeux
+                ctx.fillStyle = '#FFF';
+                ctx.beginPath();
+                ctx.arc(
+                    x + box/2 + Math.cos(angle + Math.PI/2) * eyeOffset,
+                    y + box/2 + Math.sin(angle + Math.PI/2) * eyeOffset,
+                    eyeSize, 0, 2 * Math.PI
+                );
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(
+                    x + box/2 + Math.cos(angle - Math.PI/2) * eyeOffset,
+                    y + box/2 + Math.sin(angle - Math.PI/2) * eyeOffset,
+                    eyeSize, 0, 2 * Math.PI
+                );
+                ctx.fill();
+                ctx.stroke();
+
+                // Pupilles
+                ctx.fillStyle = '#000';
+                const pupilSize = eyeSize/2;
+                ctx.beginPath();
+                ctx.arc(
+                    x + box/2 + Math.cos(angle + Math.PI/2) * eyeOffset,
+                    y + box/2 + Math.sin(angle + Math.PI/2) * eyeOffset,
+                    pupilSize, 0, 2 * Math.PI
+                );
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(
+                    x + box/2 + Math.cos(angle - Math.PI/2) * eyeOffset,
+                    y + box/2 + Math.sin(angle - Math.PI/2) * eyeOffset,
+                    pupilSize, 0, 2 * Math.PI
+                );
+                ctx.fill();
+            } else {
+                // Corps du serpent
+                ctx.fillStyle = '#4ECDC4';
+                ctx.beginPath();
+                ctx.ellipse(x + box/2, y + box/2, box/2.5, box/3, 0, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#FF6B6B';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
+        }
+
+        function drawFood(x, y) {
+            currentFruit.draw(ctx, x, y, box);
+        }
+
+        function drawBomb(x, y) {
+            // Corps de la bombe
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(x + box/2, y + box/2, box/2.5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#FF6B6B';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Mèche de la bombe
+            ctx.strokeStyle = '#FF6B6B';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + box/2, y + box/4);
+            ctx.quadraticCurveTo(x + box/2 + box/4, y, x + box/2 + box/3, y + box/4);
+            ctx.stroke();
+
+            // Étincelle
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(x + box/2 + box/3, y + box/4, box/8, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function addBomb() {
+            let newBomb;
+            do {
+                newBomb = {
+                    x: Math.floor(Math.random() * 20) * box,
+                    y: Math.floor(Math.random() * 20) * box
+                };
+            } while (
+                // Éviter de placer la bombe sur le serpent
+                snake.some(segment => segment.x === newBomb.x && segment.y === newBomb.y) ||
+                // Éviter de placer la bombe sur la nourriture
+                (food.x === newBomb.x && food.y === newBomb.y) ||
+                // Éviter de placer la bombe sur une autre bombe
+                bombs.some(bomb => bomb.x === newBomb.x && bomb.y === newBomb.y)
+            );
+            bombs.push(newBomb);
+        }
+
+        function checkBombCollision() {
+            const head = snake[0];
+            for (let i = 0; i < bombs.length; i++) {
+                if (head.x === bombs[i].x && head.y === bombs[i].y) {
+                    const rect = canvas.getBoundingClientRect();
+                    createExplosion(rect.left + head.x + box/2, rect.top + head.y + box/2);
+                    
+                    if (snake.length <= 5) {
+                        clearInterval(game);
+                        gameOverDiv.style.display = 'block';
+                        gameOverDiv.innerHTML = 'Game Over!<p>Appuyez sur ESPACE pour recommencer</p>';
+                        const score = snake.length - 1;
+                        if (score > highScore) {
+                            highScore = score;
+                            localStorage.setItem('snakeHighScore', highScore);
+                            document.getElementById('highScoreValue').textContent = highScore;
+                        }
+                        return true;
+                    } else {
+                        for (let j = 0; j < 5; j++) {
+                            snake.pop();
+                        }
+                        bombs.splice(i, 1);
+                        return false;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function createExplosion(x, y) {
+            const particles = [];
+            const colors = ['#FF6B6B', '#FFD700', '#FF4500', '#FFA500'];
+            const particleCount = 30;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'explosion-particle';
+                particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                particle.style.left = x + 'px';
+                particle.style.top = y + 'px';
+                
+                const angle = (Math.PI * 2 * i) / particleCount;
+                const velocity = 8 + Math.random() * 8;
+                const vx = Math.cos(angle) * velocity;
+                const vy = Math.sin(angle) * velocity;
+                
+                document.body.appendChild(particle);
+                particles.push({
+                    element: particle,
+                    vx: vx,
+                    vy: vy,
+                    life: 1
+                });
+            }
+
+            const explosionSound = new Audio('data:audio/wav;base64,UklGRigBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQBAAB5/3n/');
+            explosionSound.volume = 0.2;
+            explosionSound.play();
+
+            function updateParticles() {
+                let alive = false;
+                particles.forEach(particle => {
+                    if (particle.life > 0) {
+                        alive = true;
+                        particle.life -= 0.02;
+                        particle.element.style.opacity = particle.life;
+                        
+                        const currentX = parseFloat(particle.element.style.left);
+                        const currentY = parseFloat(particle.element.style.top);
+                        
+                        particle.element.style.left = (currentX + particle.vx) + 'px';
+                        particle.element.style.top = (currentY + particle.vy) + 'px';
+                        
+                        particle.vy += 0.2; // gravité
+                    } else {
+                        particle.element.remove();
+                    }
+                });
+                
+                if (alive) {
+                    requestAnimationFrame(updateParticles);
+                }
+            }
+            
+            requestAnimationFrame(updateParticles);
+        }
+
+        function createConfetti(x, y) {
+            const rect = canvas.getBoundingClientRect();
+            const confettiX = rect.left + x;
+            const confettiY = rect.top + y;
+            const colors = ['#FF6B6B', '#4ECDC4', '#FFD700', '#FFF'];
+            
+            for (let i = 0; i < 20; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = confettiX + 'px';
+                confetti.style.top = confettiY + 'px';
+                
+                // Angle plus restreint pour un effet plus compact
+                const angle = (Math.PI * 2 * i) / 20 + (Math.random() * 0.5 - 0.25);
+                // Vitesse réduite
+                const velocity = 3 + Math.random() * 2;
+                const vx = Math.cos(angle) * velocity;
+                const vy = Math.sin(angle) * velocity;
+                
+                document.body.appendChild(confetti);
+                
+                let opacity = 1;
+                let posX = confettiX;
+                let posY = confettiY;
+                let rotation = Math.random() * 360;
+                
+                function updateConfetti() {
+                    if (opacity <= 0) {
+                        confetti.remove();
+                        return;
+                    }
+                    
+                    opacity -= 0.03; // Disparition plus rapide
+                    posX += vx * 0.8; // Mouvement horizontal réduit
+                    posY += vy * 0.8; // Mouvement vertical réduit
+                    rotation += 10; // Rotation constante
+                    
+                    confetti.style.opacity = opacity;
+                    confetti.style.transform = `rotate(${rotation}deg)`;
+                    confetti.style.left = posX + 'px';
+                    confetti.style.top = posY + 'px';
+                    
+                    requestAnimationFrame(updateConfetti);
+                }
+                
+                requestAnimationFrame(updateConfetti);
+            }
+
+            const popSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAB5/3n/');
+            popSound.volume = 0.1;
+            popSound.play();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#E8F5E9';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#4ECDC4';
+            for(let i = 0; i < canvas.width; i += box) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // Dessiner les bombes
+            bombs.forEach(bomb => drawBomb(bomb.x, bomb.y));
+
+            for (let i = 0; i < snake.length; i++) {
+                const isHead = i === 0;
+                const prevSegment = snake[i - 1];
+                const nextSegment = snake[i + 1];
+                drawSnakeSegment(
+                    snake[i].x,
+                    snake[i].y,
+                    isHead,
+                    prevSegment ? prevSegment.x : null,
+                    prevSegment ? prevSegment.y : null,
+                    nextSegment ? nextSegment.x : null,
+                    nextSegment ? nextSegment.y : null
+                );
+            }
+            
+            drawFood(food.x, food.y);
+
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            lastDirection = direction;
+
+            if (direction === 'LEFT') snakeX -= box;
+            if (direction === 'UP') snakeY -= box;
+            if (direction === 'RIGHT') snakeX += box;
+            if (direction === 'DOWN') snakeY += box;
+
+            if (snakeX === food.x && snakeY === food.y) {
+                food = {
+                    x: Math.floor(Math.random() * 20) * box,
+                    y: Math.floor(Math.random() * 20) * box
+                };
+                currentFruit = fruits[Math.floor(Math.random() * fruits.length)];
+                createConfetti(snakeX + box/2, snakeY + box/2);
+                document.getElementById('scoreValue').textContent = snake.length;
+                // Ajouter une bombe après avoir mangé un fruit
+                addBomb();
+            } else {
+                snake.pop();
+            }
+
+            const newHead = {
+                x: snakeX,
+                y: snakeY
+            };
+
+            if (snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height ||
+                collision(newHead, snake) || checkBombCollision()) {
+                clearInterval(game);
+                gameOverDiv.style.display = 'block';
+                
+                // Créer une explosion à la position de la tête du serpent
+                const rect = canvas.getBoundingClientRect();
+                createExplosion(rect.left + snakeX + box/2, rect.top + snakeY + box/2);
+                
+                const score = snake.length - 1;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snakeHighScore', highScore);
+                    document.getElementById('highScoreValue').textContent = highScore;
+                }
+                return;
+            }
+
+            snake.unshift(newHead);
+        }
+
+        function collision(head, array) {
+            for (let i = 0; i < array.length; i++) {
+                if (head.x === array[i].x && head.y === array[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        document.addEventListener('keydown', (event) => {
+            // Vérifier que la nouvelle direction n'est pas opposée à la dernière direction appliquée
+            const newDirection = 
+                event.keyCode == 37 ? 'LEFT' :
+                event.keyCode == 38 ? 'UP' :
+                event.keyCode == 39 ? 'RIGHT' :
+                event.keyCode == 40 ? 'DOWN' : null;
+
+            if (newDirection) {
+                const oppositeDirections = {
+                    'LEFT': 'RIGHT',
+                    'RIGHT': 'LEFT',
+                    'UP': 'DOWN',
+                    'DOWN': 'UP'
+                };
+
+                // Ne changer la direction que si ce n'est pas la direction opposée à la dernière direction
+                if (oppositeDirections[newDirection] !== lastDirection) {
+                    direction = newDirection;
+                }
+            }
+            
+            // Redémarrer le jeu avec la touche espace
+            if (event.code === 'Space' && gameOverDiv.style.display === 'block') {
+                initGame();
+            }
+        });
+
+        // Initialiser le jeu au démarrage
+        initGame();
+    </script>
+</body>
+</html>
