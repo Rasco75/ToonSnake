@@ -336,14 +336,16 @@
                     y: Math.floor(Math.random() * 20) * box
                 };
             } while (
-                // Éviter de placer la bombe sur le serpent
+                // Éviter de placer la bombe sur le serpent ou sur une autre bombe
                 snake.some(segment => segment.x === newBomb.x && segment.y === newBomb.y) ||
-                // Éviter de placer la bombe sur la nourriture
-                (food.x === newBomb.x && food.y === newBomb.y) ||
-                // Éviter de placer la bombe sur une autre bombe
                 bombs.some(bomb => bomb.x === newBomb.x && bomb.y === newBomb.y)
             );
             bombs.push(newBomb);
+            updateScore();
+        }
+
+        function updateScore() {
+            document.getElementById('scoreValue').textContent = bombs.length;
         }
 
         function checkBombCollision() {
@@ -541,8 +543,6 @@
                 };
                 currentFruit = fruits[Math.floor(Math.random() * fruits.length)];
                 createConfetti(snakeX + box/2, snakeY + box/2);
-                document.getElementById('scoreValue').textContent = snake.length;
-                // Ajouter une bombe après avoir mangé un fruit
                 addBomb();
             } else {
                 snake.pop();
